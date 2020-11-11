@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.0.0)
+project(fsparse LANGUAGES C VERSION 0.1.0)
+set(CMAKE_C_STANDARD 99)
+
+add_executable(fat16parse src/fat16.c inc/fat16.h)
+target_include_directories(fat16parse PUBLIC inc)
