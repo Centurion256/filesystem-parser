@@ -8,7 +8,9 @@
 struct vector_t
 {
     size_t size;
-    void **data;
+    size_t bufsize;
+    size_t head;
+    void *data[256];
 };
 
 typedef struct vector_t *vector;
@@ -23,5 +25,8 @@ const void **vector_data(vector self);
 size_t vector_size(vector self);
 
 int vector_free(vector self);
+
+void* vector_qpop(vector self);
+
 
 #endif

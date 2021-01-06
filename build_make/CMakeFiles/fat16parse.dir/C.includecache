@@ -1,0 +1,34 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../inc/fat16.h
+stdint.h
+-
+stdio.h
+-
+
+../inc/vector.h
+stdlib.h
+-
+ctype.h
+-
+
+/home/centurion/Documents/OS/fsparse/src/fat16.c
+stdio.h
+-
+stdlib.h
+-
+stdint.h
+-
+string.h
+-
+fat16.h
+-
+vector.h
+-
+

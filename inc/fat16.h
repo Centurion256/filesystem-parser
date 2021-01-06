@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stdio.h>
-
 // struct fat16_struct_t {
 //     char        oem_name[8];
 //     uint16_t    bytes_per_sector;
@@ -57,11 +56,6 @@ struct fat16_boot_sector_t {
   struct fat16_extended_bios_parameter_block ext_bios_params;
 };
 
-struct fat16_entry {
-  uint16_t current;
-  uint16_t next;
-};
-
 struct fat16_file {
   char fname[8];
   char fextension[3];
@@ -83,6 +77,7 @@ struct fat16_fs {
   FILE* fd;
   size_t sector_size;
   size_t sectors_per_cluster;
+  size_t cluster_size;
 
   size_t fat_start;
   size_t fat_size;
@@ -91,7 +86,7 @@ struct fat16_fs {
   size_t data_start;
 
   struct fat16_boot_sector_t boot;
-  struct fat16_entry* fat;
+  uint16_t* fat;
   
 };
 
@@ -107,28 +102,49 @@ struct fat16_fs* fat16_fs_new(FILE* fd)
   fread(&(self->boot), 1, sizeof(self->boot), self->fd);
   self->sector_size = self->boot.bios_params.bytes_per_sector;
   self->sectors_per_cluster = self->boot.bios_params.sectors_per_cluster;
-
+  self->cluster_size = self->sectors_per_cluster*self->sector_size;
   self->fat_start = 0 + self->boot.bios_params.reserved_sector_count * self->boot.bios_params.bytes_per_sector; //+ boot.bios_params.reserved_sector_count
   self->fat_size = self->boot.bios_params.sectors_per_fat * self->boot.bios_params.bytes_per_sector;
-  self->fat = (struct fat16_entry *)malloc(self->fat_size);
+  self->fat = (uint16_t *)malloc(self->fat_size);
   fseek(self->fd, self->fat_start, SEEK_SET);
   fread(self->fat, 1, self->fat_size, self->fd);
 
   self->root_start = self->fat_start + (self->boot.bios_params.fat_count * self->boot.bios_params.sectors_per_fat * self->boot.bios_params.bytes_per_sector);
   self->root_size = self->boot.bios_params.max_root_entries * sizeof(struct fat16_file);
 
-  // struct fat16_file* root_dir = (struct fat16_file *)malloc(root_size);
-  // fseek(fd, self->root_start, SEEK_SET);
-  // fread(root_dir, 1, self->root_size, fd);
+
 
   self->data_start = self->root_start + self->root_size; //add 2 clusters to compensate for first two inaccessible fats
-
+  return self;
 }
 
 int fat16_fs_free(struct fat16_fs * self){
   free(self->fat);
+  fclose(self->fd);
   free(self);
 }
+
+void fat16_fs_read_cluster(struct fat16_fs * self, uint16_t cluster, void* dst){
+  size_t offset = self->data_start+self->sector_size*self->sectors_per_cluster*(cluster-2);
+  fseek(self->fd, offset, SEEK_SET);
+  fread(dst, 1, self->sector_size * self->sectors_per_cluster, self->fd);
+}
+
+
+void fat16_fs_print_info(struct fat16_fs * self){
+  struct fat16_boot_sector_t boot = self->boot;
+  printf("Bytes per sector: %d \nSectors per cluster: %d\n", self->sector_size, self->sectors_per_cluster);
+  printf("FS label: %.11s \nFS type: %.8s\n", boot.ext_bios_params.label, boot.ext_bios_params.fs_type);
+  printf("Signature: '%.4x'\n", boot.ext_bios_params.boot_sector_signature);
+  printf("Reserved sectors: %d\n", boot.bios_params.reserved_sector_count);
+  printf("FAT tables: %d\n", boot.bios_params.fat_count);
+
+  printf("FAT size in sectors: %d, in bytes: %d\n", boot.bios_params.sectors_per_fat, self->fat_size);
+
+  printf("Max root directory size in entries: %d, in bytes: %d\n", boot.bios_params.max_root_entries, self->root_size);
+  return;
+}
+
 
 struct fat16_file* fat16_fs_read_root(struct fat16_fs * self, struct fat16_file * dst){
   // struct fat16_file* root_dir;
@@ -147,10 +163,32 @@ struct fat16_file* fat16_fs_read_root(struct fat16_fs * self, struct fat16_file 
   return dst;
 }
 
-void * fat16_fs_read_file(struct fat16_fs * self, void* dst, uint16_t cluster){
+size_t fat16_fs_file_size(struct fat16_fs * self, uint16_t start_cluster){
+  uint16_t num_clusters = 0;
+  uint16_t cur_cluster = start_cluster;
+  while (cur_cluster > 0x0002 && cur_cluster < 0xfff7)
+  {
+    num_clusters++;
+    cur_cluster = self->fat[cur_cluster];
+  }
+  return num_clusters*self->cluster_size;
+}
+
+
+uint8_t * fat16_fs_read_file(struct fat16_fs * self, uint16_t start_cluster){
   // TODO: Parse FAT to create vector of clusters
   // TODO: malloc enough space depending on cluster number
   // TODO: read each cluster
+  size_t f_size = fat16_fs_file_size(self, start_cluster);
+
+  uint8_t* dst = malloc(f_size + 1);
+  uint16_t cur_cluster = start_cluster;
+  for(uint8_t* c_ptr = dst; c_ptr-dst<f_size; c_ptr += self->cluster_size)
+  {
+    fat16_fs_read_cluster(self, cur_cluster, c_ptr);
+    cur_cluster = self->fat[cur_cluster];    
+  }
+  dst[f_size] = '\0';
   return dst;
 }
 

@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../inc/vector.h
+stdlib.h
+-
+ctype.h
+-
+
+/home/centurion/Documents/OS/fsparse/src/vector.c
+vector.h
+-
+

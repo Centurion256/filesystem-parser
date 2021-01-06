@@ -1,0 +1,1 @@
+/usr/bin/cc   -rdynamic CMakeFiles/fat16parse.dir/src/fat16.c.o  -o fat16parse  libvector.a 
